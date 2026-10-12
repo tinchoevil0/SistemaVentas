@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+
+# Secretos y datos locales: NUNCA subir a GitHub
+.env
+*.db
+*.db-shm
+*.db-wal
+migracion.sql
