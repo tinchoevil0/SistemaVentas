@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Text.Json.Serialization;
 using SistemaVentas.Data;
 
@@ -14,6 +15,10 @@ if (File.Exists(envFile))
         Environment.SetEnvironmentVariable(partes[0].Trim(), partes[1].Trim().Trim('"'));
     }
 }
+
+// Usar punto decimal siempre. Sin esto, en un Windows en español un precio "9.5" puede leerse como 95.
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 

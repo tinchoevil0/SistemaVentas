@@ -1,0 +1,34 @@
+@model List<Venta>
+@{
+    ViewData["Title"] = "Ventas";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Ventas</h2>
+    <a class="btn btn-success" asp-action="Create">Nueva venta</a>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr><th>N°</th><th>Fecha</th><th>Cliente</th><th class="text-end">Total</th><th></th></tr>
+    </thead>
+    <tbody>
+        @foreach (var v in Model)
+        {
+            <tr>
+                <td>@v.Id</td>
+                <td>@v.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                <td>@v.Cliente?.Nombre</td>
+                <td class="text-end">@v.Total.ToString("N2")</td>
+                <td class="text-end">
+                    <a class="btn btn-sm btn-primary" asp-action="Details" asp-route-id="@v.Id">Ver detalle</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (Model.Count == 0)
+{
+    <p class="text-muted">Todavía no hay ventas registradas.</p>
+}

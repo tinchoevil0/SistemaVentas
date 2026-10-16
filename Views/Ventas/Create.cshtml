@@ -1,0 +1,494 @@
+@model SistemaVentas.ViewModels.NuevaVentaViewModel
+@{
+    ViewData["Title"] = "Nueva venta";
+}
+
+<h2 class="mb-3">Registro de venta</h2>
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger">
+        <div asp-validation-summary="All"></div>
+    </div>
+}
+
+<form asp-action="Create" method="post" id="formVenta" autocomplete="off">
+
+    @* Aquí el JavaScript escribe los datos que se envían al servidor *@
+    <div id="camposOcultos"></div>
+
+    <!-- 1. Fecha y cliente -->
+    <div class="card mb-3">
+        <div class="card-header fw-semibold">1. Datos de la venta</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Fecha</label>
+                    <input class="form-control" value="@DateTime.Now.ToString("dd/MM/yyyy HH:mm")" readonly />
+                </div>
+
+                <div class="col-md-5 position-relative">
+                    <label for="buscarCliente" class="form-label">Buscar cliente (nombre o celular)</label>
+                    <div class="input-group">
+                        <input id="buscarCliente" class="form-control" placeholder="Escriba y presione Enter o Tab..." />
+                        <button type="button" class="btn btn-outline-primary" id="btnNuevoCliente">Registrar cliente</button>
+                    </div>
+                    <div id="listaClientes" class="list-group position-absolute w-100 shadow"
+                         style="z-index:1000; display:none; max-height:260px; overflow:auto"></div>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Cliente de esta venta</label>
+                    <input id="clienteSeleccionado" class="form-control" placeholder="(ninguno seleccionado)" readonly />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Productos -->
+    <div class="card mb-3">
+        <div class="card-header fw-semibold">2. Productos</div>
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-6 position-relative">
+                    <label for="buscarProducto" class="form-label">Buscar producto</label>
+                    <input id="buscarProducto" class="form-control" placeholder="Escriba parte del nombre..." />
+                    <div id="listaProductos" class="list-group position-absolute w-100 shadow"
+                         style="z-index:1000; display:none; max-height:260px; overflow:auto"></div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Precio</label>
+                    <input id="precioProducto" class="form-control" readonly />
+                </div>
+                <div class="col-md-2">
+                    <label for="cantidadProducto" class="form-label">Cantidad</label>
+                    <input id="cantidadProducto" type="number" min="1" value="1" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <button type="button" id="btnAgregar" class="btn btn-success w-100" title="Agregar a la venta">+ Agregar</button>
+                </div>
+            </div>
+            <div id="mensajeProducto" class="text-danger small mt-2"></div>
+
+            <table class="table table-sm table-striped mt-3 mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:50px">#</th>
+                        <th>Producto</th>
+                        <th class="text-end">Precio</th>
+                        <th class="text-end">Cantidad</th>
+                        <th class="text-end">Subtotal</th>
+                        <th style="width:90px"></th>
+                    </tr>
+                </thead>
+                <tbody id="grilla"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 3. Pago -->
+    <div class="row justify-content-end">
+        <div class="col-md-5">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="fs-5">TOTAL A PAGAR</span>
+                        <strong class="fs-3" id="total">Bs 0.00</strong>
+                    </div>
+
+                    <label asp-for="Recibido" class="form-label">Monto recibido</label>
+                    <input asp-for="Recibido" class="form-control" type="number" step="0.01" min="0" />
+
+                    <div id="resultadoPago" class="fs-5 mt-2"></div>
+                </div>
+            </div>
+
+            <div id="ayuda" class="text-muted small mb-2"></div>
+            <button type="submit" class="btn btn-primary" id="btnRegistrar" disabled>Registrar venta</button>
+            <a class="btn btn-secondary" asp-action="Index">Cancelar</a>
+        </div>
+    </div>
+</form>
+
+<!-- Ventana para registrar un cliente nuevo -->
+<div class="modal fade" id="modalCliente" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="errorCliente" class="alert alert-danger d-none"></div>
+                <div class="mb-3">
+                    <label for="nuevoNombre" class="form-label">Nombre</label>
+                    <input id="nuevoNombre" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="nuevoCelular" class="form-label">Celular (opcional)</label>
+                    <input id="nuevoCelular" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="nuevoEmail" class="form-label">Email (opcional)</label>
+                    <input id="nuevoEmail" type="email" class="form-control" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGuardarCliente">Guardar y usar en la venta</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Se ejecuta cuando la página terminó de cargar (así Bootstrap ya está disponible)
+document.addEventListener('DOMContentLoaded', function () {
+
+    // ---------- Direcciones de las acciones del controlador ----------
+    const urlBuscarClientes   = '@Url.Action("BuscarClientes", "Ventas")';
+    const urlRegistrarCliente = '@Url.Action("RegistrarCliente", "Ventas")';
+    const urlBuscarProductos  = '@Url.Action("BuscarProductos", "Ventas")';
+
+    // ---------- Estado de la pantalla ----------
+    let cliente = @Html.Raw((string)ViewBag.ClienteJson);   // cliente elegido (o null)
+    let lineas  = @Html.Raw((string)ViewBag.LineasJson);    // productos de la grilla
+    let productoElegido = null;                             // producto elegido en el buscador
+    let resultadosClientes = [];
+
+    // ---------- Utilidades ----------
+    const el = id => document.getElementById(id);
+    const dinero = n => Number(n).toFixed(2);
+    const centavos = n => Math.round(n * 100);   // para comparar dinero sin errores de decimales
+
+    function debounce(fn, ms) {
+        let t;
+        return function () {
+            clearTimeout(t);
+            t = setTimeout(fn, ms);
+        };
+    }
+
+    function crear(tag, clase, texto) {
+        const e = document.createElement(tag);
+        if (clase) e.className = clase;
+        if (texto !== undefined) e.textContent = texto;   // textContent evita inyectar HTML
+        return e;
+    }
+
+    // ---------- CLIENTE ----------
+    async function buscarClientes() {
+        const q = el('buscarCliente').value.trim();
+        if (q === '') {
+            resultadosClientes = [];
+            el('listaClientes').style.display = 'none';
+            return;
+        }
+        const resp = await fetch(urlBuscarClientes + '?q=' + encodeURIComponent(q));
+        resultadosClientes = await resp.json();
+        mostrarListaClientes(q);
+    }
+
+    function mostrarListaClientes(q) {
+        const lista = el('listaClientes');
+        lista.innerHTML = '';
+
+        if (resultadosClientes.length === 0) {
+            lista.appendChild(crear('div', 'list-group-item text-muted',
+                'No se encontró "' + q + '". Use el botón "Registrar cliente".'));
+        } else {
+            resultadosClientes.forEach(function (c) {
+                const item = crear('button', 'list-group-item list-group-item-action',
+                    c.nombre + (c.celular ? '  -  ' + c.celular : ''));
+                item.type = 'button';
+                // mousedown (y no click) para que el campo no pierda el foco antes de elegir
+                item.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    elegirCliente(c);
+                });
+                lista.appendChild(item);
+            });
+        }
+        lista.style.display = 'block';
+    }
+
+    function mostrarClienteElegido() {
+        el('clienteSeleccionado').value = cliente
+            ? cliente.nombre + (cliente.celular ? ' (' + cliente.celular + ')' : '')
+            : '';
+    }
+
+    function elegirCliente(c) {
+        cliente = c;
+        el('buscarCliente').value = '';
+        resultadosClientes = [];
+        el('listaClientes').style.display = 'none';
+        mostrarClienteElegido();
+        actualizar();
+    }
+
+    // Al presionar Enter o saltar con Tab: si hay un solo resultado, se llena el cliente solo
+    async function resolverCliente() {
+        const q = el('buscarCliente').value.trim();
+        if (q === '') { el('listaClientes').style.display = 'none'; return; }
+        await buscarClientes();
+        if (resultadosClientes.length === 1) {
+            elegirCliente(resultadosClientes[0]);
+        } else if (resultadosClientes.length > 1) {
+            el('listaClientes').style.display = 'block';   // que elija de la lista
+        }
+    }
+
+    el('buscarCliente').addEventListener('input', debounce(buscarClientes, 250));
+    el('buscarCliente').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); resolverCliente(); }
+    });
+    el('buscarCliente').addEventListener('blur', function () {
+        setTimeout(function () {
+            if (document.activeElement !== el('buscarCliente')) {
+                resolverCliente().then(function () {
+                    if (resultadosClientes.length !== 1) el('listaClientes').style.display = 'none';
+                });
+            }
+        }, 150);
+    });
+
+    // ---------- Registrar cliente nuevo (ventana modal) ----------
+    const modalCliente = new bootstrap.Modal(el('modalCliente'));
+
+    el('btnNuevoCliente').addEventListener('click', function () {
+        const texto = el('buscarCliente').value.trim();
+        el('nuevoNombre').value = '';
+        el('nuevoCelular').value = '';
+        el('nuevoEmail').value = '';
+        // Lo que se había escrito en el buscador sirve de punto de partida
+        if (texto !== '') {
+            if (/^[0-9+ -]+$/.test(texto)) el('nuevoCelular').value = texto;
+            else el('nuevoNombre').value = texto;
+        }
+        el('errorCliente').classList.add('d-none');
+        el('listaClientes').style.display = 'none';
+        modalCliente.show();
+    });
+
+    el('btnGuardarCliente').addEventListener('click', async function () {
+        const datos = new FormData();
+        datos.append('nombre', el('nuevoNombre').value);
+        datos.append('celular', el('nuevoCelular').value);
+        datos.append('email', el('nuevoEmail').value);
+
+        try {
+            const resp = await fetch(urlRegistrarCliente, { method: 'POST', body: datos });
+            const resultado = await resp.json();
+
+            if (!resp.ok) {
+                el('errorCliente').textContent = resultado.error || 'No se pudo registrar el cliente.';
+                el('errorCliente').classList.remove('d-none');
+                return;
+            }
+            modalCliente.hide();
+            elegirCliente(resultado);      // el cliente nuevo queda cargado en la venta
+        } catch (err) {
+            el('errorCliente').textContent = 'No se pudo conectar con el servidor.';
+            el('errorCliente').classList.remove('d-none');
+        }
+    });
+
+    // ---------- PRODUCTOS ----------
+    async function buscarProductos() {
+        const q = el('buscarProducto').value.trim();
+        const resp = await fetch(urlBuscarProductos + '?q=' + encodeURIComponent(q));
+        const productos = await resp.json();
+        mostrarListaProductos(productos);
+    }
+
+    function mostrarListaProductos(productos) {
+        const lista = el('listaProductos');
+        lista.innerHTML = '';
+
+        if (productos.length === 0) {
+            lista.appendChild(crear('div', 'list-group-item text-muted', 'No hay productos con ese nombre (o sin stock).'));
+        } else {
+            productos.forEach(function (p) {
+                const item = crear('button', 'list-group-item list-group-item-action',
+                    p.nombre + '  -  Bs ' + dinero(p.precio) + '  (stock ' + p.stock + ')');
+                item.type = 'button';
+                item.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    elegirProducto(p);
+                });
+                lista.appendChild(item);
+            });
+        }
+        lista.style.display = 'block';
+    }
+
+    function elegirProducto(p) {
+        productoElegido = p;
+        el('buscarProducto').value = p.nombre;
+        el('precioProducto').value = dinero(p.precio);
+        el('cantidadProducto').value = 1;
+        el('listaProductos').style.display = 'none';
+        el('mensajeProducto').textContent = '';
+        el('cantidadProducto').focus();
+        el('cantidadProducto').select();
+    }
+
+    const buscarProductosConPausa = debounce(buscarProductos, 250);
+
+    el('buscarProducto').addEventListener('focus', buscarProductos);
+    el('buscarProducto').addEventListener('input', function () {
+        productoElegido = null;               // si escribe de nuevo, hay que volver a elegir
+        el('precioProducto').value = '';
+        buscarProductosConPausa();
+    });
+    el('buscarProducto').addEventListener('blur', function () {
+        setTimeout(function () { el('listaProductos').style.display = 'none'; }, 150);
+    });
+    el('buscarProducto').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') e.preventDefault();
+    });
+
+    // Botón "+": agrega el producto elegido a la grilla
+    function agregar() {
+        const mensaje = el('mensajeProducto');
+        mensaje.textContent = '';
+
+        if (!productoElegido) {
+            mensaje.textContent = 'Busque y elija un producto de la lista.';
+            return;
+        }
+
+        const cantidad = parseInt(el('cantidadProducto').value, 10);
+        if (!Number.isInteger(cantidad) || cantidad < 1) {
+            mensaje.textContent = 'La cantidad debe ser un número mayor a 0.';
+            return;
+        }
+
+        const existente = lineas.find(function (l) { return l.productoId === productoElegido.id; });
+        const yaAgregado = existente ? existente.cantidad : 0;
+
+        if (yaAgregado + cantidad > productoElegido.stock) {
+            mensaje.textContent = 'Stock insuficiente de ' + productoElegido.nombre +
+                ': disponible ' + productoElegido.stock +
+                (yaAgregado > 0 ? ' (ya agregó ' + yaAgregado + ')' : '') + '.';
+            return;
+        }
+
+        if (existente) {
+            existente.cantidad += cantidad;      // el mismo producto se acumula en una sola fila
+        } else {
+            lineas.push({
+                productoId: productoElegido.id,
+                nombre: productoElegido.nombre,
+                precio: productoElegido.precio,
+                stock: productoElegido.stock,
+                cantidad: cantidad
+            });
+        }
+
+        // dejar listo el buscador para el siguiente producto
+        productoElegido = null;
+        el('buscarProducto').value = '';
+        el('precioProducto').value = '';
+        el('cantidadProducto').value = 1;
+        el('buscarProducto').focus();
+        actualizar();
+    }
+
+    el('btnAgregar').addEventListener('click', agregar);
+    el('cantidadProducto').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); agregar(); }
+    });
+
+    // ---------- Redibujar grilla, totales y datos ocultos ----------
+    function actualizar() {
+
+        // grilla
+        const tbody = el('grilla');
+        tbody.innerHTML = '';
+
+        if (lineas.length === 0) {
+            const tr = crear('tr');
+            const td = crear('td', 'text-center text-muted', 'Aún no agregó productos.');
+            td.colSpan = 6;
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+        }
+
+        lineas.forEach(function (l, i) {
+            const tr = crear('tr');
+            tr.appendChild(crear('td', '', i + 1));
+            tr.appendChild(crear('td', '', l.nombre));
+            tr.appendChild(crear('td', 'text-end', dinero(l.precio)));
+            tr.appendChild(crear('td', 'text-end', l.cantidad));
+            tr.appendChild(crear('td', 'text-end', dinero(l.precio * l.cantidad)));
+
+            const tdQuitar = crear('td', 'text-end');
+            const btn = crear('button', 'btn btn-sm btn-outline-danger', 'Quitar');
+            btn.type = 'button';
+            btn.addEventListener('click', function () {
+                lineas.splice(i, 1);
+                actualizar();
+            });
+            tdQuitar.appendChild(btn);
+            tr.appendChild(tdQuitar);
+
+            tbody.appendChild(tr);
+        });
+
+        // total
+        const total = lineas.reduce(function (suma, l) { return suma + l.precio * l.cantidad; }, 0);
+        el('total').textContent = 'Bs ' + dinero(total);
+
+        // cambio o lo que falta
+        const recibido = parseFloat(el('Recibido').value);
+        const pago = el('resultadoPago');
+        const hayRecibido = !isNaN(recibido);
+
+        if (lineas.length === 0 || !hayRecibido) {
+            pago.className = 'fs-5 mt-2';
+            pago.textContent = '';
+        } else if (centavos(recibido) < centavos(total)) {
+            pago.className = 'fs-5 mt-2 text-danger fw-semibold';
+            pago.textContent = 'Falta: Bs ' + dinero(total - recibido);
+        } else {
+            pago.className = 'fs-5 mt-2 text-success fw-semibold';
+            pago.textContent = 'Cambio: Bs ' + dinero(recibido - total);
+        }
+
+        // datos que viajan al servidor al registrar la venta
+        const ocultos = el('camposOcultos');
+        ocultos.innerHTML = '';
+        function oculto(nombre, valor) {
+            const i = document.createElement('input');
+            i.type = 'hidden';
+            i.name = nombre;
+            i.value = valor;
+            ocultos.appendChild(i);
+        }
+        oculto('ClienteId', cliente ? cliente.id : '');
+        lineas.forEach(function (l, i) {
+            oculto('Lineas[' + i + '].ProductoId', l.productoId);
+            oculto('Lineas[' + i + '].Cantidad', l.cantidad);
+        });
+
+        // el botón se habilita cuando la venta está completa
+        const faltantes = [];
+        if (!cliente) faltantes.push('elegir un cliente');
+        if (lineas.length === 0) faltantes.push('agregar productos');
+        if (lineas.length > 0 && !hayRecibido) faltantes.push('ingresar el monto recibido');
+        if (lineas.length > 0 && hayRecibido && centavos(recibido) < centavos(total)) faltantes.push('completar el pago');
+
+        el('btnRegistrar').disabled = faltantes.length > 0;
+        el('ayuda').textContent = faltantes.length > 0 ? 'Para registrar: ' + faltantes.join(', ') + '.' : '';
+    }
+
+    el('Recibido').addEventListener('input', actualizar);
+
+    // ---------- Inicio ----------
+    mostrarClienteElegido();
+    actualizar();
+    el('buscarCliente').focus();
+});
+</script>

@@ -73,6 +73,9 @@ public class ProductosApiController : ControllerBase
         var producto = await _context.Productos.FindAsync(id);
         if (producto == null) return NotFound();
 
+        if (await _context.DetallesVenta.AnyAsync(d => d.ProductoId == id))
+            return Conflict("No se puede eliminar: el producto tiene ventas registradas.");
+
         _context.Productos.Remove(producto);
         await _context.SaveChangesAsync();
         return NoContent();

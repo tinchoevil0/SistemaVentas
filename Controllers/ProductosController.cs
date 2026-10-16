@@ -92,9 +92,20 @@ public class ProductosController : Controller
     [HttpPost, ActionName("Delete")]
     public async Task<IActionResult> DeleteConfirmed(int id)
     {
-        var producto = await _context.Productos.FindAsync(id);
+        var producto = await _context.Productos
+            .Include(p => p.Categoria)
+            .FirstOrDefaultAsync(p => p.Id == id);
         if (producto != null)
         {
+            // Si se borrara un producto vendido, EF borraría también sus detalles de venta
+            // y los totales de las ventas quedarían incorrectos. Lo impedimos.
+            var fueVendido = await _context.DetallesVenta.AnyAsync(d => d.ProductoId == id);
+            if (fueVendido)
+            {
+                ModelState.AddModelError("", "No se puede eliminar: el producto tiene ventas registradas.");
+                return View(producto);
+            }
+
             _context.Productos.Remove(producto);
             await _context.SaveChangesAsync();
         }
