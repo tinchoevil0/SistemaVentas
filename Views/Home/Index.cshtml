@@ -1,10 +1,323 @@
+@model SistemaVentas.ViewModels.DashboardViewModel
 @{
-    ViewData["Title"] = "Inicio";
+    ViewData["Title"] = "Dashboard";
+
+    // Cambia aquí el símbolo de moneda de todo el dashboard
+    const string Moneda = "Bs";
+    string Dinero(decimal v) => $"{Moneda} {v:N2}";
+
+    string[] dias = { "domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado" };
+    string[] meses = { "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre" };
+    var hoy = DateTime.Today;
+    var fechaTexto = $"{dias[(int)hoy.DayOfWeek]}, {hoy.Day} de {meses[hoy.Month - 1]} de {hoy.Year}";
+    fechaTexto = char.ToUpper(fechaTexto[0]) + fechaTexto[1..];
+
+    string subMes; string tonoMes;
+    if (Model.VariacionMes is decimal variacion)
+    {
+        subMes = $"{(variacion >= 0 ? "▲" : "▼")} {Math.Abs(variacion):0.#}% vs mes anterior";
+        tonoMes = variacion >= 0 ? "up" : "down";
+    }
+    else { subMes = "Sin datos del mes anterior"; tonoMes = ""; }
+
+    var kpis = new[]
+    {
+        (Label: "Ventas hoy",        Valor: Dinero(Model.VentasHoy),       Sub: $"{Model.VentasHoyCantidad} transacciones", Tono: "",       Icono: "bi-calendar-check", Color: "#10b981"),
+        (Label: "Ventas del mes",    Valor: Dinero(Model.VentasMes),       Sub: subMes,                                     Tono: tonoMes,  Icono: "bi-calendar3",      Color: "#f59e0b"),
+        (Label: "Ventas del año",    Valor: Dinero(Model.VentasAnio),      Sub: hoy.Year.ToString(),                        Tono: "",       Icono: "bi-graph-up-arrow", Color: "#3b82f6"),
+        (Label: "Ticket promedio",   Valor: Dinero(Model.TicketPromedio),  Sub: "Promedio por venta del mes",               Tono: "",       Icono: "bi-receipt",        Color: "#8b5cf6"),
+        (Label: "Clientes",          Valor: Model.TotalClientes.ToString(),Sub: "Registrados",                              Tono: "",       Icono: "bi-people",         Color: "#ec4899"),
+        (Label: "Stock bajo",        Valor: Model.ProductosStockBajo.ToString(), Sub: "Productos por reponer",              Tono: "",       Icono: "bi-box-seam",       Color: "#ef4444"),
+    };
+
+    string IconoAlerta(string tipo) => tipo switch
+    {
+        "agotado" => "bi-x-octagon",
+        "bajo" => "bi-exclamation-triangle",
+        _ => "bi-graph-down-arrow"
+    };
+
+    var maxUnidades = Model.TopProductos.Any() ? Model.TopProductos.Max(t => t.Unidades) : 1;
 }
 
-<div class="p-5 mb-4 bg-light rounded-3">
-    <h1 class="display-6">Sistema Web de Gestión de Ventas</h1>
-    <p class="lead">Programación Web II — ASP.NET Core MVC, Entity Framework Core y Turso.</p>
-    <a class="btn btn-primary" asp-controller="Productos" asp-action="Index">Ver productos</a>
-    <a class="btn btn-outline-secondary" asp-controller="Categorias" asp-action="Index">Ver categorías</a>
+<div class="page-head">
+    <h2 class="page-title">Resumen del negocio</h2>
+    <p class="page-sub">@fechaTexto</p>
 </div>
+
+@* ===== Tarjetas KPI ===== *@
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xxl-6 g-3 mb-4">
+    @foreach (var k in kpis)
+    {
+        <div class="col">
+            <div class="kpi" style="--kpi:@k.Color">
+                <div class="kpi-icon"><i class="bi @k.Icono"></i></div>
+                <div>
+                    <div class="kpi-label">@k.Label</div>
+                    <div class="kpi-value">@k.Valor</div>
+                    <div class="kpi-sub @k.Tono">@k.Sub</div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="row g-3 mb-3">
+    @* ===== Gráfico de ventas ===== *@
+    <div class="col-xl-8">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h3 class="panel-title">Ventas por día</h3>
+                    <div class="panel-sub">Evolución de ingresos en el período</div>
+                </div>
+                <div class="seg" id="rango">
+                    <button type="button" data-dias="7" class="active">7 días</button>
+                    <button type="button" data-dias="15">15 días</button>
+                    <button type="button" data-dias="30">30 días</button>
+                </div>
+            </div>
+            <div class="chart-total">
+                <span id="totalPeriodo">—</span>
+                <small id="txPeriodo"></small>
+            </div>
+            <div class="chart-box"><canvas id="chartVentas"></canvas></div>
+        </div>
+    </div>
+
+    @* ===== Alertas ===== *@
+    <div class="col-xl-4">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <h3 class="panel-title"><i class="bi bi-bell me-2"></i>Alertas importantes</h3>
+                @if (Model.AlertasTotal > 0)
+                {
+                    <span class="pill pill-danger">@Model.AlertasTotal</span>
+                }
+            </div>
+            @if (!Model.Alertas.Any())
+            {
+                <div class="empty"><i class="bi bi-check2-circle"></i>Todo en orden. No hay alertas.</div>
+            }
+            else
+            {
+                <ul class="alert-list">
+                    @foreach (var a in Model.Alertas)
+                    {
+                        <li class="alert-item tipo-@a.Tipo">
+                            <span class="alert-ico"><i class="bi @IconoAlerta(a.Tipo)"></i></span>
+                            <div>
+                                <div class="alert-title">@a.Titulo</div>
+                                <div class="alert-text">@a.Detalle</div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    @* ===== Ventas por categoría ===== *@
+    <div class="col-lg-6 col-xl-4">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h3 class="panel-title">Ventas por categoría</h3>
+                    <div class="panel-sub">Últimos 30 días</div>
+                </div>
+            </div>
+            @if (Model.VentasPorCategoria.Any())
+            {
+                <div class="chart-box sm"><canvas id="chartCategorias"></canvas></div>
+            }
+            else
+            {
+                <div class="empty"><i class="bi bi-pie-chart"></i>Aún no hay ventas en este período.</div>
+            }
+        </div>
+    </div>
+
+    @* ===== Top productos ===== *@
+    <div class="col-lg-6 col-xl-4">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h3 class="panel-title">Productos más vendidos</h3>
+                    <div class="panel-sub">Últimos 30 días, por unidades</div>
+                </div>
+            </div>
+            @if (!Model.TopProductos.Any())
+            {
+                <div class="empty"><i class="bi bi-box-seam"></i>Aún no hay ventas en este período.</div>
+            }
+            else
+            {
+                <ol class="top-list">
+                    @for (var i = 0; i < Model.TopProductos.Count; i++)
+                    {
+                        var t = Model.TopProductos[i];
+                        <li>
+                            <span class="rank">@(i + 1)</span>
+                            <div class="grow">
+                                <div class="top-name"><span>@t.Nombre</span><strong>@t.Unidades u.</strong></div>
+                                <div class="bar"><span style="width:@(t.Unidades * 100 / maxUnidades)%"></span></div>
+                                <div class="top-sub">@Dinero(t.Monto)</div>
+                            </div>
+                        </li>
+                    }
+                </ol>
+            }
+        </div>
+    </div>
+
+    @* ===== Últimas ventas ===== *@
+    <div class="col-xl-4">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <h3 class="panel-title">Últimas ventas</h3>
+                <a class="panel-link" asp-controller="Ventas" asp-action="Index">Ver todas</a>
+            </div>
+            @if (!Model.UltimasVentas.Any())
+            {
+                <div class="empty"><i class="bi bi-receipt"></i>Todavía no hay ventas registradas.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table mini-table align-middle">
+                        <thead><tr><th>Venta</th><th>Fecha</th><th class="text-end">Total</th></tr></thead>
+                        <tbody>
+                            @foreach (var v in Model.UltimasVentas)
+                            {
+                                <tr>
+                                    <td>
+                                        <a asp-controller="Ventas" asp-action="Details" asp-route-id="@v.Id">#@v.Id</a>
+                                        <div class="muted">@v.Cliente</div>
+                                    </td>
+                                    <td class="muted">@v.Fecha.ToString("dd/MM HH:mm")</td>
+                                    <td class="text-end fw-semibold">@Dinero(v.Total)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script>
+        (() => {
+            const MONEDA = '@Moneda';
+            const URL_DATOS = '@Url.Action("VentasPorDia", "Home")';
+            const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+            const fmt = n => MONEDA + ' ' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const rgba = (hex, a) => {
+                const n = parseInt(hex.slice(1), 16);
+                return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+            };
+
+            // ---- Gráfico de ventas por día ----
+            let transacciones = [];
+            const canvas = document.getElementById('chartVentas');
+            const ctx = canvas.getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Ventas', data: [], borderWidth: 2.5, tension: 0.35, fill: true, pointRadius: 3, pointHoverRadius: 6 }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: c => fmt(c.parsed.y),
+                                afterLabel: c => (transacciones[c.dataIndex] ?? 0) + ' transacciones'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: {} },
+                        y: { beginAtZero: true, grid: {}, ticks: {} }
+                    }
+                }
+            });
+
+            // ---- Gráfico de categorías (dona) ----
+            let donut = null;
+            const catCanvas = document.getElementById('chartCategorias');
+            if (catCanvas) {
+                const catLabels = @Json.Serialize(Model.VentasPorCategoria.Select(c => c.Nombre));
+                const catData = @Json.Serialize(Model.VentasPorCategoria.Select(c => c.Monto));
+                donut = new Chart(catCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: catLabels,
+                        datasets: [{ data: catData, backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7'], borderWidth: 3, hoverOffset: 6 }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '68%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+                            tooltip: { callbacks: { label: c => ' ' + c.label + ': ' + fmt(c.parsed) } }
+                        }
+                    }
+                });
+            }
+
+            // ---- Colores según tema claro/oscuro ----
+            function aplicarTema() {
+                const accent = css('--accent'), muted = css('--muted'), borde = css('--border');
+                const g = ctx.createLinearGradient(0, 0, 0, 320);
+                g.addColorStop(0, rgba(accent, 0.30));
+                g.addColorStop(1, rgba(accent, 0));
+                const ds = chart.data.datasets[0];
+                ds.borderColor = accent; ds.pointBackgroundColor = accent; ds.backgroundColor = g;
+                chart.options.scales.x.ticks.color = muted;
+                chart.options.scales.y.ticks.color = muted;
+                chart.options.scales.y.grid.color = borde;
+                chart.update();
+
+                if (donut) {
+                    donut.data.datasets[0].borderColor = css('--card');
+                    donut.options.plugins.legend.labels.color = muted;
+                    donut.update();
+                }
+            }
+
+            // ---- Cargar datos del rango seleccionado ----
+            async function cargar(dias) {
+                try {
+                    const r = await fetch(`${URL_DATOS}?dias=${dias}`);
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    const j = await r.json();
+                    transacciones = j.transacciones;
+                    chart.data.labels = j.labels;
+                    chart.data.datasets[0].data = j.totales;
+                    chart.update();
+                    document.getElementById('totalPeriodo').textContent = fmt(j.totales.reduce((a, b) => a + b, 0));
+                    document.getElementById('txPeriodo').textContent = j.transacciones.reduce((a, b) => a + b, 0) + ' transacciones';
+                } catch (e) {
+                    document.getElementById('totalPeriodo').textContent = 'No se pudieron cargar los datos';
+                }
+            }
+
+            document.querySelectorAll('#rango button').forEach(b => b.addEventListener('click', () => {
+                document.querySelectorAll('#rango button').forEach(x => x.classList.remove('active'));
+                b.classList.add('active');
+                cargar(b.dataset.dias);
+            }));
+
+            window.addEventListener('themechange', aplicarTema);
+            aplicarTema();
+            cargar(7);
+        })();
+    </script>
+}
