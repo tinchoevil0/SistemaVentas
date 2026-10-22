@@ -34,6 +34,15 @@ dotnet ef database update              # crea ventas.db local con datos iniciale
 dotnet run                             # abrir la URL que muestra la terminal
 ```
 
+## Acceso de demostración
+
+La aplicación solicita iniciar sesión antes de acceder a sus páginas. Para pruebas locales:
+
+- Usuario: `admin`
+- Contraseña: `admin123!`
+
+Estas credenciales son únicamente para demostración; no deben utilizarse en producción. Se pueden reemplazar mediante las variables de entorno `DemoLogin__Username` y `DemoLogin__Password`. El botón de Google es solo una muestra visual y no realiza autenticación.
+
 ## Flujo con Turso (el de la clase)
 
 ```bash

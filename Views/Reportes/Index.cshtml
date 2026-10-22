@@ -1,0 +1,265 @@
+@model SistemaVentas.ViewModels.ReportesViewModel
+@{
+    ViewData["Title"] = "Reportes";
+    const string Moneda = "Bs";
+    string Dinero(decimal valor) => $"{Moneda} {valor:N2}";
+    var productoEstrella = Model.ProductosVendidos.FirstOrDefault();
+    var porReponer = Model.Inventario.Where(p => p.Stock <= p.StockMinimo).ToList();
+}
+
+<div class="page-head d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+        <h2 class="page-title">Reportes y estadísticas</h2>
+        <p class="page-sub">Consulta, imprime o exporta la información de tu negocio.</p>
+    </div>
+    <div class="d-flex gap-2 d-print-none">
+        <a class="btn btn-outline-primary"
+           asp-action="ExportarCsv"
+           asp-route-desde="@Model.Desde.ToString("yyyy-MM-dd")"
+           asp-route-hasta="@Model.Hasta.ToString("yyyy-MM-dd")">
+            <i class="bi bi-filetype-csv me-1"></i>Exportar ventas CSV
+        </a>
+        <button class="btn btn-primary" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+    </div>
+</div>
+
+<div class="card-panel mb-3 d-print-none">
+    <form asp-action="Index" method="get" class="row g-3 align-items-end">
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="desde">Desde</label>
+            <input class="form-control" type="date" id="desde" name="desde" value="@Model.Desde.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="hasta">Hasta</label>
+            <input class="form-control" type="date" id="hasta" name="hasta" value="@Model.Hasta.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="col-sm-8 col-lg-4">
+            <label class="form-label" for="clienteId">Historial de compras del cliente</label>
+            <select class="form-select" id="clienteId" name="clienteId">
+                <option value="">Todos los clientes</option>
+                @foreach (var cliente in Model.Clientes)
+                {
+                    if (Model.ClienteId == cliente.Id)
+                    {
+                        <option value="@cliente.Id" selected>@cliente.Nombre</option>
+                    }
+                    else
+                    {
+                        <option value="@cliente.Id">@cliente.Nombre</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-sm-4 col-lg-2 d-grid">
+            <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Aplicar</button>
+        </div>
+    </form>
+</div>
+
+<section class="card-panel mb-3">
+    <div class="panel-head">
+        <div>
+            <h3 class="panel-title">Resumen del período</h3>
+            <div class="panel-sub">@Model.Desde.ToString("dd/MM/yyyy") al @Model.Hasta.ToString("dd/MM/yyyy")</div>
+        </div>
+    </div>
+    <div class="row g-3">
+        <div class="col-sm-4">
+            <div class="report-metric"><span>Ventas totales</span><strong>@Dinero(Model.TotalVentas)</strong><small>@Model.Ventas.Count transacciones</small></div>
+        </div>
+        <div class="col-sm-4">
+            <div class="report-metric"><span>Ticket promedio</span><strong>@Dinero(Model.TicketPromedio)</strong><small>Por venta del período</small></div>
+        </div>
+        <div class="col-sm-4">
+            <div class="report-metric"><span>Producto estrella</span><strong>@(productoEstrella?.Nombre ?? "Sin ventas")</strong><small>@(productoEstrella == null ? "No hay productos vendidos en este período" : $"{productoEstrella.Unidades} unidades")</small></div>
+        </div>
+    </div>
+    <div class="mt-3">
+        <strong>Productos por reponer:</strong>
+        @if (porReponer.Count == 0)
+        {
+            <span class="text-success"> no hay productos por debajo del mínimo.</span>
+        }
+        else
+        {
+            <span>@string.Join(", ", porReponer.Select(p => $"{p.Nombre} ({p.Stock})"))</span>
+        }
+    </div>
+</section>
+
+<div class="row g-3 mb-3">
+    <div class="col-xl-7">
+        <section class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h3 class="panel-title">Ventas por rango de fechas</h3>
+                    <div class="panel-sub">Detalle de ventas del período seleccionado</div>
+                </div>
+            </div>
+            @if (Model.Ventas.Count == 0)
+            {
+                <div class="empty"><i class="bi bi-receipt"></i>No hay ventas en este período.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table mini-table align-middle">
+                        <thead><tr><th>Venta</th><th>Fecha</th><th>Cliente</th><th class="text-end">Total</th></tr></thead>
+                        <tbody>
+                            @foreach (var venta in Model.Ventas)
+                            {
+                                <tr>
+                                    <td><a asp-controller="Ventas" asp-action="Details" asp-route-id="@venta.Id">#@venta.Id</a></td>
+                                    <td>@venta.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>@venta.Cliente</td>
+                                    <td class="text-end fw-semibold">@Dinero(venta.Total)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+    <div class="col-xl-5">
+        <section class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h3 class="panel-title">Ventas por producto</h3>
+                    <div class="panel-sub">Unidades y monto del período</div>
+                </div>
+            </div>
+            @if (Model.ProductosVendidos.Count == 0)
+            {
+                <div class="empty"><i class="bi bi-box-seam"></i>No hay productos vendidos en este período.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table mini-table align-middle">
+                        <thead><tr><th>Producto</th><th>Categoría</th><th class="text-end">Unidades</th><th class="text-end">Monto</th></tr></thead>
+                        <tbody>
+                            @foreach (var producto in Model.ProductosVendidos)
+                            {
+                                <tr>
+                                    <td>@producto.Nombre</td>
+                                    <td>@producto.Categoria</td>
+                                    <td class="text-end">@producto.Unidades</td>
+                                    <td class="text-end">@Dinero(producto.Monto)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</div>
+
+<section class="card-panel mb-3">
+    <div class="panel-head">
+        <div>
+            <h3 class="panel-title">Stock actual por producto y categoría</h3>
+            <div class="panel-sub">Productos con stock bajo o agotados destacados</div>
+        </div>
+        <span class="pill @(porReponer.Count == 0 ? "pill-success" : "pill-danger")">@porReponer.Count por reponer</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table mini-table align-middle">
+            <thead><tr><th>Producto</th><th>Categoría</th><th class="text-end">Precio</th><th class="text-end">Stock</th><th class="text-end">Mínimo</th><th>Estado</th></tr></thead>
+            <tbody>
+                @foreach (var producto in Model.Inventario)
+                {
+                    var bajo = producto.Stock <= producto.StockMinimo;
+                    <tr class="@(bajo ? "table-warning" : "")">
+                        <td>@producto.Nombre</td>
+                        <td>@producto.Categoria</td>
+                        <td class="text-end">@Dinero(producto.Precio)</td>
+                        <td class="text-end">@producto.Stock</td>
+                        <td class="text-end">@producto.StockMinimo</td>
+                        <td>
+                            @if (producto.Stock <= 0)
+                            {
+                                <span class="badge text-bg-danger">Agotado</span>
+                            }
+                            else if (bajo)
+                            {
+                                <span class="badge text-bg-warning">Por reponer</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-success">Disponible</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="row g-3">
+    @if (Model.ClienteId.HasValue)
+    {
+        <div class="col-xl-6">
+            <section class="card-panel h-100">
+                <div class="panel-head">
+                    <div>
+                        <h3 class="panel-title">Historial de @Model.ClienteSeleccionado</h3>
+                        <div class="panel-sub">Compras registradas, sin limitar al período</div>
+                    </div>
+                </div>
+                @if (Model.ComprasCliente.Count == 0)
+                {
+                    <div class="empty"><i class="bi bi-person"></i>Este cliente aún no tiene compras.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table mini-table align-middle">
+                            <thead><tr><th>Venta</th><th>Fecha</th><th class="text-end">Total</th></tr></thead>
+                            <tbody>
+                                @foreach (var compra in Model.ComprasCliente)
+                                {
+                                    <tr>
+                                        <td><a asp-controller="Ventas" asp-action="Details" asp-route-id="@compra.Id">#@compra.Id</a></td>
+                                        <td>@compra.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td class="text-end">@Dinero(compra.Total)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        </div>
+    }
+    <div class="col-xl-@(Model.ClienteId.HasValue ? "6" : "12")">
+        <section class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h3 class="panel-title">Listado de clientes</h3>
+                    <div class="panel-sub">@Model.Clientes.Count clientes registrados</div>
+                </div>
+            </div>
+            @if (Model.Clientes.Count == 0)
+            {
+                <div class="empty"><i class="bi bi-people"></i>No hay clientes registrados.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table mini-table align-middle">
+                        <thead><tr><th>Cliente</th><th>Celular</th><th>Correo</th></tr></thead>
+                        <tbody>
+                            @foreach (var cliente in Model.Clientes)
+                            {
+                                <tr><td>@cliente.Nombre</td><td>@(cliente.Celular ?? "—")</td><td>@(cliente.Email ?? "—")</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</div>

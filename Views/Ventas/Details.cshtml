@@ -5,12 +5,19 @@
 
 <h2>Venta N° @Model.Id</h2>
 
-<p>
-    <strong>Cliente:</strong> @Model.Cliente?.Nombre<br />
-    <strong>Fecha:</strong> @Model.Fecha.ToString("dd/MM/yyyy HH:mm")
-</p>
+<div class="d-flex gap-2 mb-3 d-print-none">
+    <button class="btn btn-primary" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir comprobante</button>
+    <a class="btn btn-outline-secondary" asp-action="Index">Volver al listado</a>
+</div>
 
-<table class="table">
+<section class="card-panel receipt">
+    <div class="mb-4">
+        <h3 class="panel-title">Comprobante de venta #@Model.Id</h3>
+        <div class="muted">Sistema de Ventas</div>
+        <div class="mt-2"><strong>Cliente:</strong> @Model.Cliente?.Nombre</div>
+        <div><strong>Fecha:</strong> @Model.Fecha.ToString("dd/MM/yyyy HH:mm")</div>
+    </div>
+<table class="table mini-table">
     <thead>
         <tr>
             <th>Producto</th>
@@ -46,5 +53,5 @@
     </tfoot>
 </table>
 
-<a class="btn btn-secondary" asp-action="Index">Volver al listado</a>
-<a class="btn btn-success" asp-action="Create">Nueva venta</a>
+    <div class="text-end fw-bold">Gracias por su compra</div>
+</section>

@@ -23,9 +23,11 @@
     var kpis = new[]
     {
         (Label: "Ventas hoy",        Valor: Dinero(Model.VentasHoy),       Sub: $"{Model.VentasHoyCantidad} transacciones", Tono: "",       Icono: "bi-calendar-check", Color: "#10b981"),
-        (Label: "Ventas del mes",    Valor: Dinero(Model.VentasMes),       Sub: subMes,                                     Tono: tonoMes,  Icono: "bi-calendar3",      Color: "#f59e0b"),
+        (Label: "Ventas del mes",    Valor: Dinero(Model.VentasMes),       Sub: $"{Model.VentasMesCantidad} transacciones · {subMes}", Tono: tonoMes, Icono: "bi-calendar3", Color: "#f59e0b"),
         (Label: "Ventas del año",    Valor: Dinero(Model.VentasAnio),      Sub: hoy.Year.ToString(),                        Tono: "",       Icono: "bi-graph-up-arrow", Color: "#3b82f6"),
         (Label: "Ticket promedio",   Valor: Dinero(Model.TicketPromedio),  Sub: "Promedio por venta del mes",               Tono: "",       Icono: "bi-receipt",        Color: "#8b5cf6"),
+        (Label: "Ventas registradas",Valor: Model.TotalVentas.ToString(), Sub: "Históricas",                                Tono: "",       Icono: "bi-receipt-cutoff", Color: "#0ea5e9"),
+        (Label: "Productos",         Valor: Model.TotalProductos.ToString(), Sub: "En catálogo",                             Tono: "",       Icono: "bi-box-seam",       Color: "#14b8a6"),
         (Label: "Clientes",          Valor: Model.TotalClientes.ToString(),Sub: "Registrados",                              Tono: "",       Icono: "bi-people",         Color: "#ec4899"),
         (Label: "Stock bajo",        Valor: Model.ProductosStockBajo.ToString(), Sub: "Productos por reponer",              Tono: "",       Icono: "bi-box-seam",       Color: "#ef4444"),
     };
@@ -41,12 +43,17 @@
 }
 
 <div class="page-head">
-    <h2 class="page-title">Resumen del negocio</h2>
-    <p class="page-sub">@fechaTexto</p>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h2 class="page-title">Resumen del negocio</h2>
+            <p class="page-sub">@fechaTexto</p>
+        </div>
+        <a class="btn btn-primary" asp-controller="Reportes" asp-action="Index"><i class="bi bi-bar-chart-line me-1"></i>Ver reportes</a>
+    </div>
 </div>
 
 @* ===== Tarjetas KPI ===== *@
-<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xxl-6 g-3 mb-4">
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xxl-4 g-3 mb-4">
     @foreach (var k in kpis)
     {
         <div class="col">
@@ -120,7 +127,7 @@
 
 <div class="row g-3">
     @* ===== Ventas por categoría ===== *@
-    <div class="col-lg-6 col-xl-4">
+    <div class="col-lg-6 col-xl-3">
         <div class="card-panel h-100">
             <div class="panel-head">
                 <div>
@@ -140,7 +147,7 @@
     </div>
 
     @* ===== Top productos ===== *@
-    <div class="col-lg-6 col-xl-4">
+    <div class="col-lg-6 col-xl-3">
         <div class="card-panel h-100">
             <div class="panel-head">
                 <div>
@@ -173,7 +180,7 @@
     </div>
 
     @* ===== Últimas ventas ===== *@
-    <div class="col-xl-4">
+    <div class="col-lg-6 col-xl-3">
         <div class="card-panel h-100">
             <div class="panel-head">
                 <h3 class="panel-title">Últimas ventas</h3>
@@ -203,6 +210,39 @@
                         </tbody>
                     </table>
                 </div>
+            }
+        </div>
+    </div>
+
+    @* ===== Mejores clientes ===== *@
+    <div class="col-lg-6 col-xl-3">
+        <div class="card-panel h-100">
+            <div class="panel-head">
+                <div>
+                    <h3 class="panel-title">Mejores clientes</h3>
+                    <div class="panel-sub">Por monto histórico de compra</div>
+                </div>
+                <a class="panel-link" asp-controller="Reportes" asp-action="Index">Historial</a>
+            </div>
+            @if (!Model.TopClientes.Any())
+            {
+                <div class="empty"><i class="bi bi-people"></i>Aún no hay compras registradas.</div>
+            }
+            else
+            {
+                <ol class="top-list">
+                    @for (var i = 0; i < Model.TopClientes.Count; i++)
+                    {
+                        var cliente = Model.TopClientes[i];
+                        <li>
+                            <span class="rank">@(i + 1)</span>
+                            <div class="grow">
+                                <div class="top-name"><span>@cliente.Nombre</span><strong>@cliente.Ventas v.</strong></div>
+                                <div class="top-sub">@Dinero(cliente.Monto)</div>
+                            </div>
+                        </li>
+                    }
+                </ol>
             }
         </div>
     </div>

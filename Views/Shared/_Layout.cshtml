@@ -24,6 +24,7 @@
             <span class="side-title">General</span>
             <a class="side-link @Active("Home")" asp-controller="Home" asp-action="Index"><i class="bi bi-speedometer2"></i> Dashboard</a>
             <a class="side-link @Active("Ventas")" asp-controller="Ventas" asp-action="Index"><i class="bi bi-receipt"></i> Ventas</a>
+            <a class="side-link @Active("Reportes")" asp-controller="Reportes" asp-action="Index"><i class="bi bi-bar-chart-line"></i> Reportes</a>
 
             <span class="side-title">Catálogo</span>
             <a class="side-link @Active("Productos")" asp-controller="Productos" asp-action="Index"><i class="bi bi-box-seam"></i> Productos</a>
@@ -38,8 +39,12 @@
             <button class="icon-btn d-lg-none" id="menuBtn" aria-label="Abrir menú"><i class="bi bi-list"></i></button>
             <h1 class="topbar-title">@ViewData["Title"]</h1>
             <div class="ms-auto d-flex align-items-center gap-2">
+                <span class="topbar-user d-none d-sm-inline"><i class="bi bi-person-circle me-1"></i>@User.Identity?.Name</span>
                 <a class="btn btn-primary btn-sm" asp-controller="Ventas" asp-action="Create"><i class="bi bi-plus-lg me-1"></i>Nueva venta</a>
                 <button class="icon-btn" id="themeBtn" aria-label="Cambiar tema"></button>
+                <form asp-controller="Account" asp-action="Logout" method="post" class="m-0">
+                    <button class="icon-btn" type="submit" aria-label="Cerrar sesión" title="Cerrar sesión"><i class="bi bi-box-arrow-right"></i></button>
+                </form>
             </div>
         </header>
 

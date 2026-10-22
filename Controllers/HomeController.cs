@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using SistemaVentas.Data;
 using SistemaVentas.ViewModels;
@@ -39,8 +40,11 @@ public class HomeController : Controller
         vm.VentasHoy = ventasHoy.Sum(v => v.Total);
         vm.VentasHoyCantidad = ventasHoy.Count;
         vm.VentasMes = ventasMes.Sum(v => v.Total);
+        vm.VentasMesCantidad = ventasMes.Count;
         vm.VentasAnio = ventasAnio.Sum(v => v.Total);
         vm.TicketPromedio = ventasMes.Count > 0 ? vm.VentasMes / ventasMes.Count : 0;
+        vm.TotalVentas = await _context.Ventas.CountAsync();
+        vm.TotalProductos = await _context.Productos.CountAsync();
 
         // ── Variación frente al mes anterior ──
         var totalMesAnterior = (await _context.Ventas.AsNoTracking()
@@ -115,6 +119,16 @@ public class HomeController : Controller
             .OrderByDescending(c => c.Monto)
             .ToList();
 
+        var clientesConVentas = await _context.Ventas.AsNoTracking()
+            .Select(v => new { v.ClienteId, Cliente = v.Cliente!.Nombre, v.Total })
+            .ToListAsync();
+        vm.TopClientes = clientesConVentas
+            .GroupBy(v => new { v.ClienteId, v.Cliente })
+            .Select(g => new TopClienteDashboard(g.Key.ClienteId, g.Key.Cliente, g.Count(), g.Sum(v => v.Total)))
+            .OrderByDescending(c => c.Monto)
+            .Take(5)
+            .ToList();
+
         // ── Últimas ventas ──
         var ultimas = await _context.Ventas.AsNoTracking()
             .OrderByDescending(v => v.Fecha)
@@ -158,6 +172,7 @@ public class HomeController : Controller
         return Json(new { labels, totales, transacciones });
     }
 
+    [AllowAnonymous]
     public IActionResult Error()
     {
         return Content("Ocurrió un error. Intenta nuevamente.");
