@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using SistemaVentas.Data;
 
-// 1) Cargar el archivo .env (ASP.NET Core no lo lee solo). En Railway no existe: se usan variables del panel.
+// Cargar .env para desarrollo local; en producción se usan variables del hosting.
 var envFile = Path.Combine(Directory.GetCurrentDirectory(), ".env");
 if (File.Exists(envFile))
 {
@@ -47,15 +47,38 @@ builder.Services.AddAuthorization(options =>
         .Build();
 });
 
-// 2) Base de datos. El proveedor se cambia SOLO en esta línea.
-//    Ahora: SQLite (archivo local). Ver README, sección "Conexión a Turso".
-//var dbPath = Environment.GetEnvironmentVariable("DB_PATH") ?? "ventas.db";
-var dbPath = Environment.GetEnvironmentVariable("DB_PATH")
-             ?? Path.Combine(builder.Environment.ContentRootPath, "ventas.db");
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath}"));
+// La aplicación requiere Turso; no usa una base SQLite local como respaldo.
+var databaseUrl = Environment.GetEnvironmentVariable("TURSO_DATABASE_URL");
+var authToken = Environment.GetEnvironmentVariable("TURSO_AUTH_TOKEN");
 
-// 3) Railway entrega el puerto en la variable PORT
+if (string.IsNullOrWhiteSpace(databaseUrl) || string.IsNullOrWhiteSpace(authToken))
+{
+    throw new InvalidOperationException(
+        "TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must be configured.");
+}
+
+if (!Uri.TryCreate(databaseUrl, UriKind.Absolute, out var tursoUri)
+    || (!tursoUri.Scheme.Equals("libsql", StringComparison.OrdinalIgnoreCase)
+        && !tursoUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+{
+    throw new InvalidOperationException(
+        "TURSO_DATABASE_URL must be a valid libsql:// or https:// URL.");
+}
+
+var endpoint = new UriBuilder(tursoUri)
+{
+    Scheme = Uri.UriSchemeHttps,
+    Port = -1,
+    Path = "/v2/pipeline",
+    Query = string.Empty,
+    Fragment = string.Empty
+}.Uri.AbsoluteUri;
+
+var connectionString = $"{endpoint};{authToken.Trim()}";
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseLibSql(connectionString));
+
+// El hosting puede entregar el puerto en la variable PORT.
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))
     builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
@@ -65,7 +88,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();   // crea las tablas (y los datos iniciales) si no existen
+    db.Database.Migrate();
 }
 
 if (!app.Environment.IsDevelopment())

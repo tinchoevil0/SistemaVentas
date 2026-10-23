@@ -1,13 +1,13 @@
 # Sistema Web de Gestión de Ventas
 
-Proyecto de ejemplo — Programación Web II. ASP.NET Core MVC + Razor + Entity Framework Core + Turso (SQLite/libSQL).
+ASP.NET Core MVC + Razor + Entity Framework Core 9 + Turso/libSQL.
 
 ## Estructura
 
 ```
 SistemaVentas/
 ├── SistemaVentas.csproj
-├── Program.cs                  ← configuración, .env, DbContext, rutas
+├── Program.cs                  ← configuración de Turso, .env, DbContext, rutas
 ├── Dockerfile                  ← para el deploy (Railway)
 ├── .gitignore  .env.example    ← el .env real NO se sube
 ├── Models/                     ← Categoria, Cliente, Producto, Venta, DetalleVenta
@@ -23,16 +23,89 @@ SistemaVentas/
 └── wwwroot/
 ```
 
-## Puesta en marcha (cada estudiante)
+## Puesta en marcha
 
 ```bash
-dotnet --version                       # debe ser 10.x (el .csproj usa net10.0)
-dotnet tool install --global dotnet-ef # en Linux/WSL: export PATH="$PATH:$HOME/.dotnet/tools"
-dotnet build                           # debe compilar sin errores
-dotnet ef migrations add Inicial       # crea la carpeta Migrations
-dotnet ef database update              # crea ventas.db local con datos iniciales
-dotnet run                             # abrir la URL que muestra la terminal
+dotnet --version                       # SDK 10.x
+dotnet tool install --global dotnet-ef --version '9.*'
+dotnet build
 ```
+
+## Conexión a Turso
+
+La aplicación usa directamente una base remota Turso; no crea ni usa `ventas.db`.
+Al arrancar, `Database.Migrate()` crea las tablas pendientes y aplica los datos iniciales
+de `AppDbContext` (categorías y productos).
+
+1. En Windows, abrir WSL e instalar la CLI de Turso si aún no está instalada:
+
+   ```bash
+   curl -sSfL https://get.tur.so/install.sh | bash
+   export PATH="$HOME/.turso:$PATH"
+   ```
+
+   Iniciar sesión. En WSL, usar el modo `--headless` y abrir manualmente en el navegador
+   el enlace que muestra la CLI:
+
+   ```bash
+   turso auth login --headless
+   turso auth whoami
+   ```
+
+2. Esta app usa la base existente `ventas-db` de la cuenta `tinchoevil0`, en
+   `aws-us-east-1`. **No crear otra base**. Consultar su URL y generar un token de base
+   nuevo para esta computadora:
+
+   ```bash
+   turso db show ventas-db
+   turso db tokens create ventas-db
+   ```
+
+3. En PowerShell, desde la carpeta `SistemaVentas`, copiar el ejemplo y editar `.env`:
+
+   ```powershell
+   Copy-Item .env.example .env
+   notepad .env
+   ```
+
+   Reemplazar `TURSO_DATABASE_URL` por
+   `libsql://ventas-db-tinchoevil0.aws-us-east-1.turso.io` y `TURSO_AUTH_TOKEN`
+   por el token recién generado. No publicar ni compartir ese token. `.env` está
+   excluido de Git y hay que crear uno por computadora.
+
+4. Instalar el SDK de .NET 10 y ejecutar desde `SistemaVentas`:
+
+   ```bash
+   dotnet tool install --global dotnet-ef --version 9.*
+   dotnet build
+   dotnet run
+   ```
+
+   Si `dotnet-ef` ya está instalado, no hace falta volver a instalarlo.
+   La base ya tiene la migración inicial y los datos de demostración; al iniciar,
+   `Database.Migrate()` solo aplica migraciones pendientes.
+5. Verificar la base, si se desea:
+
+   ```bash
+   turso db shell ventas-db
+   ```
+
+   Dentro del shell SQL:
+
+   ```sql
+   SELECT name FROM sqlite_master WHERE type='table';
+   SELECT Nombre FROM Categorias;
+   SELECT Nombre FROM Productos;
+   ```
+
+   La primera ejecución en otra computadora no crea otra base; conecta a la misma
+   base remota usando su `.env`.
+
+Para continuar trabajando localmente, ejecutar `dotnet run` desde la carpeta del proyecto.
+Para cada cambio de modelos, crear una migración con `dotnet ef migrations add NombreCambio`
+y desplegar la aplicación para que `Database.Migrate()` la aplique. Las variables
+`TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN` también deben configurarse como secretos/
+variables de entorno en el hosting; no subir `.env` ni publicar el token.
 
 ## Acceso de demostración
 
@@ -43,35 +116,15 @@ La aplicación solicita iniciar sesión antes de acceder a sus páginas. Para pr
 
 Estas credenciales son únicamente para demostración; no deben utilizarse en producción. Se pueden reemplazar mediante las variables de entorno `DemoLogin__Username` y `DemoLogin__Password`. El botón de Google es solo una muestra visual y no realiza autenticación.
 
-## Flujo con Turso (el de la clase)
+## Deploy
 
-```bash
-dotnet ef migrations script -o migracion.sql
-turso db shell ventas-db < migracion.sql
-turso db shell ventas-db "SELECT name FROM sqlite_master WHERE type='table';"
-```
+El workflow `.github/workflows/deploy.yml` publica a MonsterASP mediante FTPS. Antes
+del despliegue, configurar `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN` en la configuración
+de entorno de la aplicación en el hosting; el archivo `.env` local no se publica.
+Confirmar también que el plan de hosting admite la versión de .NET requerida por el proyecto.
 
-Cada cambio de modelo: nueva migración (`dotnet ef migrations add NombreCambio`) y repetir el script.
-Para un script solo de lo nuevo: `dotnet ef migrations script NombreAnterior NombreNuevo -o cambio.sql`.
-
-## Conexión a Turso desde la aplicación (decisión pendiente)
-
-`Program.cs` usa hoy SQLite local (`UseSqlite`) para que todos puedan compilar y probar ya.
-Con el proveedor oficial `Microsoft.EntityFrameworkCore.Sqlite` se generan las migraciones y el script SQL
-que se aplica a Turso con la CLI. Conectar la app en ejecución directamente a la base remota requiere un
-proveedor/driver de Turso compatible con EF Core que **debe probarse antes de depender de él**
-(tarea S2-07 del backlog). Todo el cambio vive en una sola línea de `Program.cs`.
-
-Plan B para el deploy si ese proveedor no funciona: SQLite en un volumen persistente de la plataforma
-(`DB_PATH=/data/ventas.db`).
-
-## Deploy (Railway u otro)
-
-1. Subir el repositorio a GitHub (sin `.env`, sin `*.db`).
-2. En Railway: *New Project → Deploy from GitHub repo*. Detecta el `Dockerfile`.
-3. Variables de entorno en el panel: `DB_PATH` (y `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` si se usa Turso).
-4. Railway define `PORT`; `Program.cs` ya lo lee.
-5. Confirmar las condiciones vigentes del plan gratuito de la plataforma antes de la fecha de entrega.
+El `Dockerfile` queda disponible para despliegues en plataformas como Railway. En ese
+caso, configurar las mismas variables de entorno en el panel de la plataforma.
 
 ## Git
 
