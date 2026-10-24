@@ -27,7 +27,7 @@ jobs:
           protocol: ftps
           security: loose
           local-dir: ./publish/
-          server-dir: ./wwwroot/
+          server-dir: ./
           exclude: |
             **/.git*
             **/.git*/**
