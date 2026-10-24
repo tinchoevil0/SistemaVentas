@@ -71,7 +71,8 @@ de `AppDbContext` (categorías y productos).
    Reemplazar `TURSO_DATABASE_URL` por
    `libsql://ventas-db-tinchoevil0.aws-us-east-1.turso.io` y `TURSO_AUTH_TOKEN`
    por el token recién generado. No publicar ni compartir ese token. `.env` está
-   excluido de Git y hay que crear uno por computadora.
+   excluido de Git y hay que crear uno por computadora. Las variables de entorno
+   ya definidas en el sistema o el hosting tienen prioridad sobre los valores de `.env`.
 
 4. Instalar el SDK de .NET 10 y ejecutar desde `SistemaVentas`:
 

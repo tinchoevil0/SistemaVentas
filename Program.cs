@@ -14,7 +14,9 @@ if (File.Exists(envFile))
         var l = linea.Trim();
         if (l.Length == 0 || l.StartsWith('#') || !l.Contains('=')) continue;
         var partes = l.Split('=', 2);
-        Environment.SetEnvironmentVariable(partes[0].Trim(), partes[1].Trim().Trim('"'));
+        var nombre = partes[0].Trim();
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(nombre)))
+            Environment.SetEnvironmentVariable(nombre, partes[1].Trim().Trim('"'));
     }
 }
 
